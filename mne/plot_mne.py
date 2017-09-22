@@ -2,7 +2,8 @@ import pandas as pd
 
 from phantom_helpers import plot_errors
 
-methods = ['dipfit', 'lcmv', 'music']
+# methods = ['dipfit', 'lcmv', 'music']
+methods = ['dipfit', 'music', 'MxNE_depth_95', 'irMxNE_depth_95']
 
 maxfilter = 'True'
 dfs = []
@@ -19,4 +20,4 @@ for m in methods:
 errors = pd.concat(dfs, axis=0, ignore_index=True)
 
 plot_errors(errors, "mne_%s" % maxfilter, postfix="",
-            ylim=(0, 25), xlabel_mapping=None)
+            ylim=(0, 15), xlabel_mapping=None)
