@@ -14,7 +14,7 @@ import mne
 
 def plot_errors(errors, kind, postfix='', ylim=(0, 20), xkey='maxfilter',
                 xlabel_mapping={"False": 'Raw', "True": 'SSS',
-                                'mne': 'SSS$_{MNE}$'}):
+                                'mne': 'SSS$_{MNE}$'}, error_type='pos_error'):
     errors_init = errors.copy()
     errors = errors.copy()
     errors[xkey] = errors[xkey].astype(str)
@@ -33,11 +33,19 @@ def plot_errors(errors, kind, postfix='', ylim=(0, 20), xkey='maxfilter',
         for di in dipole_indices:
             query = 'dipole_index==%s and dipole_amplitude==%s' % (di, da)
             this_errors = errors.query(query)
-            this_errors = this_errors[[xkey, 'error']].set_index(xkey)
+            this_errors = this_errors[[xkey, error_type]].set_index(xkey)
             this_errors = this_errors.loc[xticklabels].values
             ax.plot(xs, this_errors, label='%d' % di)
+        if error_type == 'pos_error':
+            ylabel = 'Position Error (mm)'
+        elif error_type == 'ori_error':
+            ylabel = 'Orientation Error (Rad)'
+            ylim = (0, 2)
+        elif error_type == 'amp_error':
+            ylabel = 'Amplitude Error (nAm)'
+
         ax.set(title='%d nAm' % da, ylim=ylim, xticks=xs,
-               ylabel='Error (mm)', xlim=[0, len(xticklabels) - 1])
+               ylabel=ylabel, xlim=[0, len(xticklabels) - 1])
         ax.set(xticklabels=[''] * len(xs))
         if ai == len(dipole_amplitudes) - 1:
             ax.set(xticklabels=xticklabels)
@@ -147,7 +155,7 @@ def get_bench_params(base_path):
         dipole_amplitudes = [20, 100, 200, 1000]
         dipole_indices = [5, 6, 7, 8]
         maxfilter_options = [False, True, 'mne']
-        actual_pos = mne.dipole.get_phantom_dipoles('otaniemi')[0]
+        actual_pos, actual_ori = mne.dipole.get_phantom_dipoles('otaniemi')
         bads = ['MEG2233', 'MEG2422', 'MEG0111']
     else:
         dipole_amplitudes = [20, 200, 1000]
@@ -156,7 +164,8 @@ def get_bench_params(base_path):
         actual_pos = mne.dipole.get_phantom_dipoles('vectorview')[0]
         bads = ['MEG1323', 'MEG1133', 'MEG0613', 'MEG1032', 'MEG2313',
                 'MEG1133', 'MEG0613', 'MEG0111', 'MEG2423']
-    return maxfilter_options, dipole_amplitudes, dipole_indices, actual_pos, bads
+    return (maxfilter_options, dipole_amplitudes, dipole_indices, actual_pos,
+            actual_ori, bads)
 
 
 def get_dataset(name):

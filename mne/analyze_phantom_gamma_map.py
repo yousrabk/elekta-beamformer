@@ -13,8 +13,8 @@ from itertools import product
 
 import numpy as np
 import pandas as pd
-import mne
 from mne.parallel import parallel_func
+from mne.inverse_sparse import gamma_map
 
 from phantom_helpers import get_data, plot_errors, get_bench_params, get_fwd
 from phantom_helpers import get_dataset
@@ -49,16 +49,21 @@ def run(da, di, mf):
         base_path, di, da, mf, bads=bads)
 
     t_start = time.time()
-    dip = mne.beamformer.rap_music(
-        evoked, fwd, cov, n_dipoles=1, return_residual=False)[0]
+    dip = gamma_map(
+        evoked, fwd, cov, alpha=0.5, return_as_dipoles=True, loose=1)
     t_end = time.time() - t_start
 
-    pos = dip.pos[0]
-    ori = dip.ori[0]
+    print(" n_sources=%s" % len(dip), end='')
+    amp_max = [np.max(d.amplitude) for d in dip]
+    idx_max = np.argmax(amp_max)
+
+    pos = dip[idx_max].pos[0]
+    ori = dip[idx_max].ori[0]
+    amp = dip[idx_max].amplitude
 
     pos_error = 1e3 * np.linalg.norm(pos - actual_pos[di - 1])
     ori_error = np.arccos(np.abs(np.sum(ori * actual_ori[di - 1])))
-    amp_error = np.mean(np.abs(da - dip.amplitude / 1.e-9))
+    amp_error = np.mean(np.abs(da - amp / 1.e-9))
 
     print(" Location Error=%s mm" % np.round(pos_error, 1))
     return pd.DataFrame([(actual_pos[di - 1][0], actual_pos[di - 1][1],
@@ -75,4 +80,4 @@ errors = parallel([prun(da, di, mf) for mf, da, di in
                            dipole_indices)])
 errors = pd.concat(errors, axis=0, ignore_index=True)
 
-plot_errors(errors, 'music', postfix=postfix)
+plot_errors(errors, 'gamma_map', postfix=postfix)

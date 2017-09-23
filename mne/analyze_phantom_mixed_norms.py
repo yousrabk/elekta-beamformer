@@ -21,29 +21,37 @@ from phantom_helpers import get_data, plot_errors, get_bench_params, get_fwd
 from phantom_helpers import get_dataset
 
 from mayavi import mlab
+import time
 
 # base_path, postfix = get_dataset('aston')
 base_path, postfix = get_dataset('')
 
-maxfilter_options, dipole_amplitudes, dipole_indices, actual_pos, bads =\
-    get_bench_params(base_path)
+(maxfilter_options, dipole_amplitudes, dipole_indices, actual_pos,
+ actual_ori, bads) = get_bench_params(base_path)
 
 src, fwd = get_fwd(base_path)
 
-columns = ['actual_pos', 'estimated_pos', 'estimated_ori',
-           'dipole_index', 'dipole_amplitude', 'maxfilter', 'error']
+columns = ['actual_pos_x', 'actual_pos_y', 'actual_pos_z',
+           'estimated_pos_x', 'estimated_pos_y', 'estimated_pos_z',
+           'actual_ori_x', 'actual_ori_y', 'actual_ori_z',
+           'estimated_ori_x', 'estimated_ori_y', 'estimated_ori_z',
+           'dipole_index', 'dipole_amplitude', 'maxfilter',
+           'pos_error', 'ori_error', 'amp_error', 'run_time',
+           'alpha', 'n_mxne_iter', 'depth', 'weight']
+
 loose, depth = 1., 0.95
-n_mxne_iter = 10
-weight, weights_min = '', None
+n_mxne_iter = 1
+weight, weights_min = 'dSPM', None
 # dipole_indices = [[5, 6], [5, 7], [5, 8], [6, 7], [6, 8], [7, 8]]
 
 
-def plot_pos_ori(pos, ori, color='red'):
-    mlab.points3d(pos[:, 0], pos[:, 1], pos[:, 2], scale_factor=0.05,
+def plot_pos_ori(pos, ori, color=(1., 0., 0.)):
+    mlab.points3d(pos[:, 0], pos[:, 1], pos[:, 2], scale_factor=0.005,
                   color=color)
     mlab.quiver3d(pos[:, 0], pos[:, 1], pos[:, 2],
-                  ori[:, 0], ori[:, 1], ori[:, 2], scale_factor=0.05,
-                  color=color)
+                  ori[:, 0], ori[:, 1], ori[:, 2],
+                  scale_factor=0.000005,
+                  color=[color] * len(ori))
 
 
 def run(da, di, mf):
@@ -76,20 +84,31 @@ def run(da, di, mf):
         weights_min = None
 
     # Do MxNE
+    alpha = 40.
+    t_start = time.time()
     dip = mixed_norm(
-        evoked, fwd, cov, alpha=40., n_mxne_iter=n_mxne_iter,
+        evoked, fwd, cov, alpha=alpha, n_mxne_iter=n_mxne_iter,
         depth=depth, weights=stc_weight, weights_min=weights_min,
         return_residual=False, return_as_dipoles=True)
+    t_end = time.time() - t_start
 
     print(" n_sources=%s" % len(dip), end='')
     amp_max = [np.max(d.amplitude) for d in dip]
     idx_max = np.argmax(amp_max)
     pos = dip[idx_max].pos[0]
     ori = dip[idx_max].ori[0]
-    error = 1e3 * np.linalg.norm(pos - actual_pos[di - 1])
 
-    print(" Error=%s mm" % np.round(error, 1))
-    return pd.DataFrame([(actual_pos[di - 1], pos, ori, di, da, mf, error)],
+    pos_error = 1e3 * np.linalg.norm(pos - actual_pos[di - 1])
+    ori_error = np.arccos(np.abs(np.sum(ori * actual_ori[di - 1])))
+    amp_error = np.mean(np.abs(da - dip[idx_max].amplitude / 1.e-9))
+
+    print(" Location Error=%s mm" % np.round(pos_error, 1))
+    return pd.DataFrame([(actual_pos[di - 1][0], actual_pos[di - 1][1],
+                          actual_pos[di - 1][2], pos[0], pos[1], pos[2],
+                          actual_ori[di - 1][0], actual_ori[di - 1][1],
+                          actual_ori[di - 1][2], ori[0], ori[1], ori[2],
+                          di, da, mf, pos_error, ori_error, amp_error, t_end,
+                          alpha, n_mxne_iter, depth, weight)],
                         columns=columns)
 
 parallel, prun, _ = parallel_func(run, n_jobs=1)
@@ -105,6 +124,11 @@ name = '%sMxNE_depth_%s%s' % (iterative, depth, weight)
 
 plot_errors(errors, name, postfix=postfix)
 
-_, _, _, sphere = get_data(base_path, 5, 1000, True, bads=bads)
-plot_pos_ori(errors['actual_pos'], errors['actual_ori'], color='red')
-plot_pos_ori(errors['estimated_pos'], errors['estimated_ori'], color='green')
+# epochs, _, _, sphere = get_data(base_path, 5, 1000, True, bads=bads)
+# _, _, _, _, _, actual_ori = get_bench_params(base_path)
+# mne.viz.plot_alignment(epochs.info, bem=sphere, surfaces=[])
+# actual_pos = np.concatenate(errors['actual_pos'].values, axis=0).reshape(-1, 3)
+# plot_pos_ori(actual_pos, actual_ori[errors['dipole_index'] - 1], color=(1., 0., 0.))
+# estimated_pos = np.concatenate(errors['estimated_pos'].values, axis=0).reshape(-1, 3)
+# estimated_ori = np.concatenate(errors['estimated_ori'].values, axis=0).reshape(-1, 3)
+# plot_pos_ori(estimated_pos, estimated_ori, color=(0., 1., 0.))
