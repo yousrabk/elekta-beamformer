@@ -13,6 +13,10 @@ from mne.io import read_raw_fif
 
 from mayavi import mlab
 
+from phantom_helpers import compute_error
+import pandas as pd
+import seaborn as sns
+
 data_path = bst_phantom_elekta.data_path()
 
 raw_fname = op.join(data_path, 'kojak_all_200nAm_pp_no_chpi_no_ms_raw.fif')
@@ -45,13 +49,20 @@ fwd = mne.make_forward_solution(
 
 cov = mne.compute_covariance(epochs, tmax=0)
 
-event_id = 10
+event_id = 15
 evoked = epochs[str(event_id)].average()
 n_times = len(evoked.times)
+
+actual_pos, actual_ori = mne.dipole.get_phantom_dipoles()
+actual_amp = 100.  # nAm
 
 # RAP-MUSIC
 dip_music = rap_music(evoked, fwd, cov, n_dipoles=1,
                       return_residual=False)[0]
+error_music_pos, error_music_ori, error_music_amp = \
+    compute_error(actual_pos[event_id], dip_music.pos[0],
+                  actual_ori[event_id], dip_music.ori[0],
+                  actual_amp, dip_music.amplitude)
 
 # Mixed norm
 dip_mxne = mixed_norm(evoked, fwd, cov, alpha=10., n_mxne_iter=1,
@@ -61,6 +72,11 @@ amp_max = [np.max(d.amplitude) for d in dip_mxne]
 idx_max = np.argmax(amp_max)
 dip_mxne = dip_mxne[idx_max]
 
+error_mxne_pos, error_mxne_ori, error_mxne_amp = \
+    compute_error(actual_pos[event_id], dip_mxne.pos[0],
+                  actual_ori[event_id], dip_mxne.ori[0],
+                  actual_amp, dip_mxne.amplitude)
+
 # Iterative mixed norm
 dip_irmxne = mixed_norm(evoked, fwd, cov, alpha=10., n_mxne_iter=10,
                         depth=0.9, return_residual=False,
@@ -69,60 +85,69 @@ amp_max = [np.max(d.amplitude) for d in dip_irmxne]
 idx_max = np.argmax(amp_max)
 dip_irmxne = dip_irmxne[idx_max]
 
+error_irmxne_pos, error_irmxne_ori, error_irmxne_amp = \
+    compute_error(actual_pos[0], dip_irmxne.pos[0],
+                  actual_ori[0], dip_irmxne.ori[0],
+                  actual_amp, dip_irmxne.amplitude)
+
 # Dipole fit
 idx_peak = np.argmax(evoked.copy().pick_types(meg='grad').data.std(axis=0))
 t_peak = evoked.times[idx_peak]
 evoked.crop(t_peak, t_peak)
 
 dip_fit = fit_dipole(evoked, cov, sphere, n_jobs=1)[0]
+error_dipfit_pos, error_dipfit_ori, error_dipfit_amp = \
+    compute_error(actual_pos[0], dip_fit.pos[0],
+                  actual_ori[0], dip_fit.ori[0],
+                  actual_amp, dip_fit.amplitude)
+
+
+columns = ['loc_x', 'loc_y', 'loc_z', 'ori_x', 'ori_y', 'ori_z',
+           'loc_error', 'ori_error', 'amp_error']
+index = ['dipfit', 'music', 'mxne', 'irmxne']
+
+d = np.array([[dip_fit.pos[0][0], dip_fit.pos[0][1], dip_fit.pos[0][2],
+               dip_fit.ori[0][0], dip_fit.ori[0][1], dip_fit.ori[0][2],
+               error_dipfit_pos, error_dipfit_ori, error_dipfit_amp],
+              [dip_music.pos[0][0], dip_music.pos[0][1], dip_music.pos[0][2],
+               dip_music.ori[0][0], dip_music.ori[0][1], dip_music.ori[0][2],
+               error_music_pos, error_music_ori, error_music_amp],
+              [dip_mxne.pos[0][0], dip_mxne.pos[0][1], dip_mxne.pos[0][2],
+               dip_mxne.ori[0][0], dip_mxne.ori[0][1], dip_mxne.ori[0][2],
+               error_mxne_pos, error_mxne_ori, error_mxne_amp],
+              [dip_irmxne.pos[0][0], dip_irmxne.pos[0][1],
+               dip_irmxne.pos[0][2], dip_irmxne.ori[0][0],
+               dip_irmxne.ori[0][1], dip_irmxne.ori[0][2],
+               error_irmxne_pos, error_irmxne_ori, error_irmxne_amp]])
+
+data = pd.DataFrame(data=d, index=index, columns=columns)
 
 ##########################################################################
 # Now we can compare to the actual locations, taking the difference in mm:
-names = ['dipfit', 'music', 'mxne', 'irmxne']
-actual_pos, actual_ori = mne.dipole.get_phantom_dipoles()
-actual_amp = [100.] * len(names)  # nAm
-dip_fit.amplitude = np.concatenate(np.array([dip_fit.amplitude] * n_times))
 
 fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(6, 7))
 
-dipoles_pos = [dip_fit.pos[0], dip_music.pos[0],
-               dip_mxne.pos[0], dip_irmxne.pos[0]]
-dipoles_ori = [dip_fit.ori[0], dip_music.ori[0],
-               dip_mxne.ori[0], dip_irmxne.ori[0]]
-dipoles_amp = [dip_fit.amplitude, dip_music.amplitude,
-               dip_mxne.amplitude, dip_irmxne.amplitude]
-
-diffs = 1000 * np.sqrt(np.sum((dipoles_pos - actual_pos[event_id]) ** 2,
-                              axis=-1))
-ax1.bar(range(len(names)), diffs)
-ax1.set_xlabel('Dipole index')
-ax1.set_ylabel('Loc. error (mm)')
-
-angles = np.arccos(np.abs(np.sum(dipoles_ori * actual_ori[event_id], axis=1)))
-ax2.bar(range(len(names)), angles)
-ax2.set_xlabel('Dipole index')
-ax2.set_ylabel('Angle error (rad)')
-
-amps = np.abs(actual_amp - np.array(dipoles_amp).max(axis=1) / 1e-9)
-ax3.bar(range(len(names)), amps)
-ax3.set_xlabel('Dipole index')
-ax3.set_ylabel('Amplitude error (nAm)')
-
-fig.tight_layout()
+sns.barplot(x=index, y='loc_error', data=data, ax=ax1)
+sns.barplot(x=index, y='ori_error', data=data, ax=ax2)
+sns.barplot(x=index, y='amp_error', data=data, ax=ax3)
 plt.show()
 
 
 def plot_pos_ori(pos, ori, color=(1., 0., 0.)):
-    mlab.points3d(pos[:, 0], pos[:, 1], pos[:, 2], scale_factor=0.005,
+    mlab.points3d(pos[0], pos[1], pos[2], scale_factor=0.005,
                   color=color)
-    mlab.quiver3d(pos[:, 0], pos[:, 1], pos[:, 2],
-                  ori[:, 0], ori[:, 1], ori[:, 2],
+    mlab.quiver3d(pos[0], pos[1], pos[2],
+                  ori[0], ori[1], ori[2],
                   scale_factor=0.03,
-                  color=color)  # [color] * len(ori))
+                  color=color)
 
-mne.viz.plot_alignment(epochs.info, bem=sphere, surfaces=[])
-plot_pos_ori(actual_pos[event_id:event_id + 1],
-             actual_ori[event_id:event_id + 1], color=(1., 0., 0.))
-dipoles_pos = np.concatenate(dipoles_pos, axis=0).reshape(-1, 3)
-dipoles_ori = np.concatenate(dipoles_ori, axis=0).reshape(-1, 3)
-plot_pos_ori(dipoles_pos, dipoles_ori, color=(0., 1., 0.))
+# mne.viz.plot_alignment(epochs.info, bem=sphere, surfaces=[])
+plot_pos_ori(actual_pos[event_id],
+             actual_ori[event_id], color=(1., 0., 0.))
+
+colors = [(0., 1., 0.), (0., 0., 1.), (1., 0., 1.), (1., 1., 0.)]
+for i_m, (m, col) in enumerate(zip(index, colors)):
+    dip_pos = data[['loc_x', 'loc_y', 'loc_z']][i_m:i_m + 1].values[0]
+    dip_ori = data[['ori_x', 'ori_y', 'ori_z']][i_m:i_m + 1].values[0]
+
+    plot_pos_ori(dip_pos, dip_ori, color=col)

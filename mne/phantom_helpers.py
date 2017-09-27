@@ -178,3 +178,11 @@ def get_dataset(name):
         base_path = op.join(op.dirname(__file__), '..', '..', 'phantom_aston')
         postfix = '_aston'
     return base_path, postfix
+
+
+def compute_error(actual_pos, estimated_pos, actual_ori, estimated_ori,
+                  actual_amp, estimated_amp):
+    error_pos = 1e3 * np.linalg.norm(estimated_pos - actual_pos)
+    error_ori = np.arccos(np.abs(np.sum(estimated_ori * actual_ori)))
+    error_amp = np.abs(estimated_amp.max() / 1.e-9 - actual_amp / 2.)
+    return error_pos, error_ori, error_amp
