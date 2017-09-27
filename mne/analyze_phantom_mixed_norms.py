@@ -41,7 +41,7 @@ columns = ['actual_pos_x', 'actual_pos_y', 'actual_pos_z',
 
 loose, depth = 1., 0.95
 n_mxne_iter = 1
-weight, weights_min = 'dSPM', None
+weight, weights_min = '', None
 # dipole_indices = [[5, 6], [5, 7], [5, 8], [6, 7], [6, 8], [7, 8]]
 
 
@@ -100,7 +100,7 @@ def run(da, di, mf):
 
     pos_error = 1e3 * np.linalg.norm(pos - actual_pos[di - 1])
     ori_error = np.arccos(np.abs(np.sum(ori * actual_ori[di - 1])))
-    amp_error = np.mean(np.abs(da - dip[idx_max].amplitude / 1.e-9))
+    amp_error = np.mean(np.abs(da / 2. - dip[idx_max].amplitude / 1.e-9))
 
     print(" Location Error=%s mm" % np.round(pos_error, 1))
     return pd.DataFrame([(actual_pos[di - 1][0], actual_pos[di - 1][1],

@@ -5,8 +5,6 @@ Elekta Phantom data with MUSIC
 ==============================
 """
 
-# authors: Amit & Alex & Eric
-
 from __future__ import print_function
 
 from itertools import product
@@ -69,7 +67,7 @@ def run(da, di, mf):
                           alpha, n_mxne_iter, depth, weight)],
                         columns=columns)
 
-parallel, prun, _ = parallel_func(run, n_jobs=4)
+parallel, prun, _ = parallel_func(run, n_jobs=1)
 errors = parallel([prun(da, di, mf) for mf, da, di in
                    product(maxfilter_options, dipole_amplitudes,
                            dipole_indices)])

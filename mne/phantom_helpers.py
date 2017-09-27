@@ -60,6 +60,8 @@ def plot_errors(errors, kind, postfix='', ylim=(0, 20), xkey='maxfilter',
         fig_fname = basename + ext
         plt.savefig(op.join('figures', fig_fname))
     plt.show()
+    postfix = ''
+    basename = ('phantom_errors_%s%s.' % (kind, postfix))
     errors_init.to_csv(op.join('results', basename + 'csv'), index=False)
 
 

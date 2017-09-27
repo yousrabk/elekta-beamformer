@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-==============================
-Elekta Phantom data with MUSIC
-==============================
+==================================
+Elekta Phantom data with Gamma-Map
+==================================
 """
 
 # authors: Amit & Alex & Eric
@@ -50,7 +50,7 @@ def run(da, di, mf):
 
     t_start = time.time()
     dip = gamma_map(
-        evoked, fwd, cov, alpha=0.5, return_as_dipoles=True, loose=1)
+        evoked, fwd, cov, alpha=0.1, return_as_dipoles=True, loose=1)
     t_end = time.time() - t_start
 
     print(" n_sources=%s" % len(dip), end='')
@@ -74,7 +74,7 @@ def run(da, di, mf):
                           alpha, n_mxne_iter, depth, weight)],
                         columns=columns)
 
-parallel, prun, _ = parallel_func(run, n_jobs=4)
+parallel, prun, _ = parallel_func(run, n_jobs=1)
 errors = parallel([prun(da, di, mf) for mf, da, di in
                    product(maxfilter_options, dipole_amplitudes,
                            dipole_indices)])
