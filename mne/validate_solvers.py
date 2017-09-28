@@ -47,7 +47,7 @@ fwd = mne.make_forward_solution(
     epochs.info, trans=None, src=src, bem=sphere, eeg=False,
     meg=True)
 
-cov = mne.compute_covariance(epochs, tmax=0)
+cov = mne.compute_covariance(epochs, tmax=0.)
 
 event_id = 15
 evoked = epochs[str(event_id)].average()
@@ -86,8 +86,8 @@ idx_max = np.argmax(amp_max)
 dip_irmxne = dip_irmxne[idx_max]
 
 error_irmxne_pos, error_irmxne_ori, error_irmxne_amp = \
-    compute_error(actual_pos[0], dip_irmxne.pos[0],
-                  actual_ori[0], dip_irmxne.ori[0],
+    compute_error(actual_pos[event_id], dip_irmxne.pos[0],
+                  actual_ori[event_id], dip_irmxne.ori[0],
                   actual_amp, dip_irmxne.amplitude)
 
 # Dipole fit
@@ -97,8 +97,8 @@ evoked.crop(t_peak, t_peak)
 
 dip_fit = fit_dipole(evoked, cov, sphere, n_jobs=1)[0]
 error_dipfit_pos, error_dipfit_ori, error_dipfit_amp = \
-    compute_error(actual_pos[0], dip_fit.pos[0],
-                  actual_ori[0], dip_fit.ori[0],
+    compute_error(actual_pos[event_id], dip_fit.pos[0],
+                  actual_ori[event_id], dip_fit.ori[0],
                   actual_amp, dip_fit.amplitude)
 
 
@@ -133,7 +133,7 @@ sns.barplot(x=index, y='amp_error', data=data, ax=ax3)
 plt.show()
 
 
-def plot_pos_ori(pos, ori, color=(1., 0., 0.)):
+def plot_pos_ori(pos, ori, color=(0., 0., 0.)):
     mlab.points3d(pos[0], pos[1], pos[2], scale_factor=0.005,
                   color=color)
     mlab.quiver3d(pos[0], pos[1], pos[2],
@@ -143,9 +143,9 @@ def plot_pos_ori(pos, ori, color=(1., 0., 0.)):
 
 # mne.viz.plot_alignment(epochs.info, bem=sphere, surfaces=[])
 plot_pos_ori(actual_pos[event_id],
-             actual_ori[event_id], color=(1., 0., 0.))
+             actual_ori[event_id], color=(0., 0., 0.))
 
-colors = [(0., 1., 0.), (0., 0., 1.), (1., 0., 1.), (1., 1., 0.)]
+colors = [(0., 0., .8), (1., 0.5, 0.), (0., 1., 0.), (1., 0., 0.)]
 for i_m, (m, col) in enumerate(zip(index, colors)):
     dip_pos = data[['loc_x', 'loc_y', 'loc_z']][i_m:i_m + 1].values[0]
     dip_ori = data[['ori_x', 'ori_y', 'ori_z']][i_m:i_m + 1].values[0]
