@@ -54,7 +54,7 @@ cov = mne.compute_covariance(epochs, tmax=0.)
 
 df_errors = []
 
-for event_id in [14, 15]:
+for event_id in [5, 15, 25]:
     evoked = epochs[str(event_id)].average()
     n_times = len(evoked.times)
 
@@ -69,25 +69,27 @@ for event_id in [14, 15]:
                                 dip_music.amplitude, **actual_params)
 
     # Mixed norm
-    dip_mxne = mixed_norm(evoked, fwd, cov, alpha=10., n_mxne_iter=1,
-                          depth=0.9, return_residual=False,
+    dip_mxne = mixed_norm(evoked, fwd, cov, alpha=70., n_mxne_iter=1,
+                          depth=0.99, return_residual=False,
                           return_as_dipoles=True)
     amp_max = [np.max(d.amplitude) for d in dip_mxne]
     idx_max = np.argmax(amp_max)
     dip_mxne = dip_mxne[idx_max]
 
-    error_mxne = compute_error(dip_mxne.pos[0], dip_mxne.ori[0],
+    idx_max = np.argmax(dip_mxne.amplitude)
+    error_mxne = compute_error(dip_mxne.pos[idx_max], dip_mxne.ori[idx_max],
                                dip_mxne.amplitude, **actual_params)
 
     # Iterative mixed norm
-    dip_irmxne = mixed_norm(evoked, fwd, cov, alpha=10., n_mxne_iter=10,
-                            depth=0.9, return_residual=False,
+    dip_irmxne = mixed_norm(evoked, fwd, cov, alpha=70., n_mxne_iter=10,
+                            depth=0.99, return_residual=False,
                             return_as_dipoles=True)
     amp_max = [np.max(d.amplitude) for d in dip_irmxne]
     idx_max = np.argmax(amp_max)
     dip_irmxne = dip_irmxne[idx_max]
 
-    error_irmxne = compute_error(dip_irmxne.pos[0], dip_irmxne.ori[0],
+    idx_max = np.argmax(dip_irmxne.amplitude)
+    error_irmxne = compute_error(dip_irmxne.pos[0], dip_irmxne.ori[idx_max],
                                  dip_irmxne.amplitude, **actual_params)
 
     # Dipole fit
@@ -142,11 +144,15 @@ def plot_pos_ori(pos, ori, color=(0., 0., 0.)):
                   color=color)
 
 # mne.viz.plot_alignment(epochs.info, bem=sphere, surfaces=[])
-plot_pos_ori(actual_pos[event_id],
-             actual_ori[event_id], color=(0., 0., 0.))
+# plot_pos_ori(actual_pos[event_id],
+#              actual_ori[event_id], color=(0., 0., 0.))
 
 colors = [(0., 0., .8), (1., 0.5, 0.), (0., 1., 0.), (1., 0., 0.)]
 for i_m, (m, col) in enumerate(zip(df.index, colors)):
+    event_id = df['Diple Index'][i_m]
+    plot_pos_ori(actual_pos[event_id],
+                 actual_ori[event_id], color=(0., 0., 0.))
+
     dip_pos = df[['loc_x', 'loc_y', 'loc_z']].iloc[i_m:i_m + 1].values[0]
     dip_ori = df[['ori_x', 'ori_y', 'ori_z']].iloc[i_m:i_m + 1].values[0]
 
