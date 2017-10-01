@@ -180,9 +180,17 @@ def get_dataset(name):
     return base_path, postfix
 
 
-def compute_error(actual_pos, estimated_pos, actual_ori, estimated_ori,
-                  actual_amp, estimated_amp):
+def compute_error(estimated_pos, estimated_ori, estimated_amp,
+                  actual_pos, actual_ori, actual_amp):
     error_pos = 1e3 * np.linalg.norm(estimated_pos - actual_pos)
     error_ori = np.arccos(np.abs(np.sum(estimated_ori * actual_ori)))
     error_amp = np.abs(estimated_amp.max() / 1.e-9 - actual_amp / 2.)
-    return error_pos, error_ori, error_amp
+    return dict(loc_error=error_pos,
+                ori_error=error_ori,
+                amp_error=error_amp,
+                loc_x=actual_pos[0],
+                loc_y=actual_pos[1],
+                loc_z=actual_pos[2],
+                ori_x=actual_ori[0],
+                ori_y=actual_ori[1],
+                ori_z=actual_ori[2])
